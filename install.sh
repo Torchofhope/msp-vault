@@ -31,9 +31,8 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 [ "$(id -u)" -ne 0 ] && error "Run as root: bash install.sh"
 
 # Helper: run a command as www-data without requiring sudo
-# Uses 'runuser' (available on all Debian systems without sudo)
 as_webuser() {
-    runuser -u www-data -- "$@"
+    su -s /bin/bash www-data -c "$*"
 }
 
 # Detect server IP if no domain set
