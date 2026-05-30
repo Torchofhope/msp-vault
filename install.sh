@@ -119,6 +119,8 @@ info "Database '${DB_NAME}' created."
 # =============================================================================
 info "Step 5/9 — Cloning MSP-Vault..."
 
+git config --global --add safe.directory "$INSTALL_DIR"
+
 if [ -d "$INSTALL_DIR" ]; then
     warning "$INSTALL_DIR already exists — pulling latest changes."
     git -C "$INSTALL_DIR" pull --quiet
