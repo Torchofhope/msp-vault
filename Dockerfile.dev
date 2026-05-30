@@ -5,10 +5,12 @@ RUN apt-get update && apt-get install -y \
     git unzip curl gnupg2 libgpgme-dev libssl-dev \
     libpng-dev libjpeg-dev libfreetype6-dev \
     libonig-dev libxml2-dev libzip-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN pecl install gnupg && docker-php-ext-enable gnupg
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install pdo_mysql mbstring intl zip gd bcmath opcache
 
 # Enable Apache mod_rewrite
