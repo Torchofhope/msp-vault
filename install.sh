@@ -28,15 +28,18 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 [ "$(id -u)" -ne 0 ] && error "Run as root: sudo bash install.sh"
 
-# Auto-detect available PHP version (prefers 8.3, falls back to 8.2 or 8.4)
+# Detect the PHP version that will be installed by the unversioned 'php' meta-package.
+# On Debian, packages are named 'php-cli', 'php-fpm' etc. (no version suffix).
+# We still need the version number for the FPM socket path.
 detect_php_version() {
-    for ver in 8.3 8.2 8.4; do
-        if apt-cache show "php${ver}" &>/dev/null 2>&1; then
-            echo "$ver"
-            return
-        fi
-    done
-    error "No supported PHP version (8.2/8.3/8.4) found in apt. Run: apt-get update first."
+    # 'php' meta-package depends on a specific versioned package — extract the version
+    local ver
+    ver=$(apt-cache depends php 2>/dev/null | awk '/Depends: php[0-9]/{gsub(/[^0-9.]/,"",$2); print $2; exit}')
+    if [ -z "$ver" ]; then
+        # Fallback: check which php binary exists after install
+        ver=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
+    fi
+    echo "$ver"
 }
 PHP_VER=$(detect_php_version)
 info "Detected PHP version: ${PHP_VER}"
@@ -60,20 +63,38 @@ apt-get update -qq
 apt-get upgrade -y -qq
 
 # =============================================================================
-# 2. PHP 8.2 + EXTENSIONS
+# 2. PHP + EXTENSIONS
 # =============================================================================
-info "Step 2/9 — Installing PHP 8.2 and extensions..."
+info "Step 2/9 — Installing PHP ${PHP_VER} and extensions..."
 
-# Debian 13 ships PHP 8.2 in main repos
+# Debian uses unversioned package names: php-cli, php-fpm, etc.
+# The 'php' meta-package pulls in the correct version automatically.
 apt-get install -y -qq \
-    php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-fpm \
-    php${PHP_VER}-mysql php${PHP_VER}-mbstring php${PHP_VER}-intl \
-    php${PHP_VER}-zip php${PHP_VER}-gd php${PHP_VER}-bcmath php${PHP_VER}-opcache \
-    php${PHP_VER}-curl php${PHP_VER}-ldap php${PHP_VER}-xml php${PHP_VER}-gnupg \
-    gnupg2 curl git unzip openssl nginx
+    php php-cli php-fpm \
+    php-mysql php-mbstring php-intl \
+    php-zip php-gd php-bcmath php-opcache \
+    php-curl php-ldap php-xml \
+    php-dev php-pear \
+    libgpgme-dev gnupg2 \
+    curl git unzip openssl nginx
 
-# Verify gnupg extension is available
-php -m | grep -q gnupg || error "PHP gnupg extension not loaded. Check: apt install php${PHP_VER}-gnupg"
+# Detect actual PHP version now that php is installed
+PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+info "PHP ${PHP_VER} installed."
+
+# Install php-gnupg: try apt first, fall back to PECL
+if apt-get install -y -qq php-gnupg 2>/dev/null; then
+    info "php-gnupg installed via apt."
+else
+    info "php-gnupg not in apt — installing via PECL (takes ~2 min)..."
+    pecl install gnupg 2>/dev/null
+    PHP_INI_DIR=$(php --ini | grep "Scan for additional" | awk '{print $NF}')
+    echo "extension=gnupg.so" > "${PHP_INI_DIR}/gnupg.ini"
+    info "php-gnupg installed via PECL."
+fi
+
+# Verify gnupg extension loaded
+php -m | grep -q gnupg || error "PHP gnupg extension failed to load. Check: php -m | grep gnupg"
 
 # =============================================================================
 # 3. COMPOSER
@@ -290,7 +311,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;
+        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;  # auto-detected version
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
@@ -304,6 +325,10 @@ NGINX
 
 ln -sf /etc/nginx/sites-available/msp-vault /etc/nginx/sites-enabled/msp-vault
 rm -f /etc/nginx/sites-enabled/default
+
+# Start PHP-FPM
+systemctl enable php${PHP_VER}-fpm --quiet
+systemctl restart php${PHP_VER}-fpm
 
 nginx -t && systemctl reload nginx
 systemctl enable nginx --quiet
