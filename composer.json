@@ -148,7 +148,10 @@
             "Passbolt\\MultiTenant\\": "./plugins/PassboltCe/MultiTenant/src",
             "Passbolt\\Devices\\": "./plugins/PassboltCe/Devices/src",
             "Passbolt\\CredentialRotation\\": "./plugins/PassboltCe/CredentialRotation/src",
-            "Passbolt\\CredentialHistory\\": "./plugins/PassboltCe/CredentialHistory/src"
+            "Passbolt\\CredentialHistory\\": "./plugins/PassboltCe/CredentialHistory/src",
+            "Passbolt\\MspDashboard\\": "./plugins/PassboltCe/MspDashboard/src",
+            "Passbolt\\AuditReport\\": "./plugins/PassboltCe/AuditReport/src",
+            "Passbolt\\CredentialEscrow\\": "./plugins/PassboltCe/CredentialEscrow/src"
         }
     },
     "autoload-dev": {
