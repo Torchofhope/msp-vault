@@ -275,11 +275,14 @@ info "Step 8/9 — Running database migrations..."
 
 cd "$INSTALL_DIR"
 
+# Ensure bin/cake is executable
+chmod +x bin/cake
+
 run_migration() {
     local label=$1
     local plugin_arg=${2:-""}
     info "  Migrating: ${label}"
-    as_webuser bin/cake migrations migrate ${plugin_arg} --no-lock 2>&1 | tail -3
+    php bin/cake.php migrations migrate ${plugin_arg} --no-lock 2>&1 | tail -3
 }
 
 run_migration "Core"
@@ -291,7 +294,7 @@ run_migration "MspEntraId"         "--plugin Passbolt/MspEntraId"
 run_migration "SuperOpsSync"       "--plugin Passbolt/SuperOpsSync"
 
 info "Creating admin user: ${ADMIN_EMAIL}"
-as_webuser bin/cake passbolt register_user \
+php bin/cake.php passbolt register_user \
     --username   "$ADMIN_EMAIL" \
     --first-name "$ADMIN_FIRST" \
     --last-name  "$ADMIN_LAST" \
