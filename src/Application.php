@@ -77,6 +77,8 @@ use EmailQueue\EmailQueuePlugin;
 use Migrations\MigrationsPlugin;
 use Passbolt\EmailDigest\EmailDigestPlugin;
 use Passbolt\AuditReport\AuditReportPlugin;
+use Passbolt\MspEntraId\MspEntraIdPlugin;
+use Passbolt\SuperOpsSync\SuperOpsSyncPlugin;
 use Passbolt\CredentialEscrow\CredentialEscrowPlugin;
 use Passbolt\CredentialHistory\CredentialHistoryPlugin;
 use Passbolt\CredentialRotation\CredentialRotationPlugin;
@@ -278,7 +280,9 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
             ->addPlugin(CredentialHistoryPlugin::class)
             ->addPlugin(MspDashboardPlugin::class)
             ->addPlugin(AuditReportPlugin::class)
-            ->addPlugin(CredentialEscrowPlugin::class);
+            ->addPlugin(CredentialEscrowPlugin::class)
+            ->addPlugin(MspEntraIdPlugin::class)
+            ->addPlugin(SuperOpsSyncPlugin::class);
     }
 
     /**

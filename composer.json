@@ -151,7 +151,9 @@
             "Passbolt\\CredentialHistory\\": "./plugins/PassboltCe/CredentialHistory/src",
             "Passbolt\\MspDashboard\\": "./plugins/PassboltCe/MspDashboard/src",
             "Passbolt\\AuditReport\\": "./plugins/PassboltCe/AuditReport/src",
-            "Passbolt\\CredentialEscrow\\": "./plugins/PassboltCe/CredentialEscrow/src"
+            "Passbolt\\CredentialEscrow\\": "./plugins/PassboltCe/CredentialEscrow/src",
+            "Passbolt\\MspEntraId\\": "./plugins/PassboltCe/MspEntraId/src",
+            "Passbolt\\SuperOpsSync\\": "./plugins/PassboltCe/SuperOpsSync/src"
         }
     },
     "autoload-dev": {
