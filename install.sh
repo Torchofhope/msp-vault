@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # MSP-Vault Installer for Debian 13 (Trixie)
-# Usage: sudo bash install.sh
+# Usage: bash install.sh  (run as root)
 # =============================================================================
 
 set -euo pipefail
@@ -21,28 +21,20 @@ SMTP_PORT="25"
 SMTP_FROM_NAME="MSP-Vault"
 # -----------------------------------------------------------------------------
 
+export COMPOSER_ALLOW_SUPERUSER=1
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()    { echo -e "${GREEN}[MSP-Vault]${NC} $1"; }
 warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-[ "$(id -u)" -ne 0 ] && error "Run as root: sudo bash install.sh"
+[ "$(id -u)" -ne 0 ] && error "Run as root: bash install.sh"
 
-# Detect the PHP version that will be installed by the unversioned 'php' meta-package.
-# On Debian, packages are named 'php-cli', 'php-fpm' etc. (no version suffix).
-# We still need the version number for the FPM socket path.
-detect_php_version() {
-    # 'php' meta-package depends on a specific versioned package — extract the version
-    local ver
-    ver=$(apt-cache depends php 2>/dev/null | awk '/Depends: php[0-9]/{gsub(/[^0-9.]/,"",$2); print $2; exit}')
-    if [ -z "$ver" ]; then
-        # Fallback: check which php binary exists after install
-        ver=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
-    fi
-    echo "$ver"
+# Helper: run a command as www-data without requiring sudo
+# Uses 'runuser' (available on all Debian systems without sudo)
+as_webuser() {
+    runuser -u www-data -- "$@"
 }
-PHP_VER=$(detect_php_version)
-info "Detected PHP version: ${PHP_VER}"
 
 # Detect server IP if no domain set
 if [ -z "$DOMAIN" ]; then
@@ -65,10 +57,8 @@ apt-get upgrade -y -qq
 # =============================================================================
 # 2. PHP + EXTENSIONS
 # =============================================================================
-info "Step 2/9 — Installing PHP ${PHP_VER} and extensions..."
+info "Step 2/9 — Installing PHP and extensions..."
 
-# Debian uses unversioned package names: php-cli, php-fpm, etc.
-# The 'php' meta-package pulls in the correct version automatically.
 apt-get install -y -qq \
     php php-cli php-fpm \
     php-mysql php-mbstring php-intl \
@@ -93,8 +83,7 @@ else
     info "php-gnupg installed via PECL."
 fi
 
-# Verify gnupg extension loaded
-php -m | grep -q gnupg || error "PHP gnupg extension failed to load. Check: php -m | grep gnupg"
+php -m | grep -q gnupg || error "PHP gnupg extension failed to load."
 
 # =============================================================================
 # 3. COMPOSER
@@ -114,7 +103,6 @@ apt-get install -y -qq mariadb-server
 systemctl enable mariadb --quiet
 systemctl start mariadb
 
-# Create database and user
 mysql -u root <<SQL
 CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
@@ -141,7 +129,7 @@ fi
 chown -R www-data:www-data "$INSTALL_DIR"
 
 info "Installing Composer dependencies (this takes a minute)..."
-sudo -u www-data composer install \
+COMPOSER_ALLOW_SUPERUSER=1 as_webuser composer install \
     --working-dir="$INSTALL_DIR" \
     --no-dev \
     --no-interaction \
@@ -153,12 +141,12 @@ sudo -u www-data composer install \
 # =============================================================================
 info "Step 6/9 — Writing configuration..."
 
-# app.php
 if [ ! -f "$INSTALL_DIR/config/app.php" ]; then
-    sudo -u www-data cp "$INSTALL_DIR/config/app.default.php" "$INSTALL_DIR/config/app.php"
+    cp "$INSTALL_DIR/config/app.default.php" "$INSTALL_DIR/config/app.php"
 fi
 
-# passbolt.php — generate a fresh one with our settings
+SMTP_FROM_DOMAIN="${DOMAIN:-localhost}"
+
 cat > "$INSTALL_DIR/config/passbolt.php" <<PHP
 <?php
 return [
@@ -176,16 +164,16 @@ return [
     ],
     'EmailTransport' => [
         'default' => [
-            'host' => '${SMTP_HOST}',
-            'port' => ${SMTP_PORT},
+            'host'    => '${SMTP_HOST}',
+            'port'    => ${SMTP_PORT},
             'timeout' => 30,
-            'tls'  => null,
+            'tls'     => null,
         ],
     ],
     'Email' => [
         'default' => [
             'transport' => 'default',
-            'from' => ['noreply@${DOMAIN:-localhost}' => '${SMTP_FROM_NAME}'],
+            'from' => ['noreply@${SMTP_FROM_DOMAIN}' => '${SMTP_FROM_NAME}'],
         ],
     ],
     'passbolt' => [
@@ -197,34 +185,37 @@ return [
 ];
 PHP
 
-chown www-data:www-data "$INSTALL_DIR/config/passbolt.php"
+chown www-data:www-data "$INSTALL_DIR/config/app.php" "$INSTALL_DIR/config/passbolt.php"
 
 # =============================================================================
-# 7. JWT KEYS
+# 7. JWT + GPG KEYS
 # =============================================================================
 info "Step 7/9 — Generating JWT and GPG keys..."
 
 JWT_DIR="$INSTALL_DIR/config/jwt"
-sudo -u www-data mkdir -p "$JWT_DIR"
+mkdir -p "$JWT_DIR"
 
 if [ ! -f "$JWT_DIR/jwt.key" ]; then
-    sudo -u www-data openssl genrsa -out "$JWT_DIR/jwt.key" 4096 2>/dev/null
-    sudo -u www-data openssl rsa -in "$JWT_DIR/jwt.key" -pubout -out "$JWT_DIR/jwt.pem" 2>/dev/null
+    openssl genrsa -out "$JWT_DIR/jwt.key" 4096 2>/dev/null
+    openssl rsa -in "$JWT_DIR/jwt.key" -pubout -out "$JWT_DIR/jwt.pem" 2>/dev/null
     chmod 640 "$JWT_DIR/jwt.key"
+    chown www-data:www-data "$JWT_DIR/jwt.key" "$JWT_DIR/jwt.pem"
     info "JWT keys generated."
 else
     info "JWT keys already exist, skipping."
 fi
 
-# GPG server key
+# GPG server key — generated as www-data so the web process can use it
 GPG_DIR="$INSTALL_DIR/config/gpg"
-sudo -u www-data mkdir -p "$GPG_DIR"
-export GNUPGHOME="$GPG_DIR"
-chown www-data:www-data "$GPG_DIR"
+mkdir -p "$GPG_DIR"
 chmod 700 "$GPG_DIR"
+chown www-data:www-data "$GPG_DIR"
 
-if ! sudo -u www-data gpg --list-secret-keys "$GPG_EMAIL" &>/dev/null; then
-    sudo -u www-data gpg --batch --gen-key 2>/dev/null <<GPGEOF
+# Set GNUPGHOME for this session
+export GNUPGHOME="$GPG_DIR"
+
+if ! as_webuser gpg --list-secret-keys "$GPG_EMAIL" &>/dev/null; then
+    as_webuser gpg --batch --gen-key 2>/dev/null <<GPGEOF
 %no-protection
 Key-Type: RSA
 Key-Length: 4096
@@ -234,33 +225,33 @@ Name-Real: MSP-Vault Server
 Name-Email: ${GPG_EMAIL}
 Expire-Date: 0
 GPGEOF
-
     info "GPG key generated for ${GPG_EMAIL}"
 fi
 
-GPG_FPR=$(sudo -u www-data gpg --list-keys --with-colons "$GPG_EMAIL" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
-sudo -u www-data gpg --armor --export "$GPG_EMAIL" > "$GPG_DIR/serverkey.asc" 2>/dev/null
-sudo -u www-data gpg --armor --export-secret-keys "$GPG_EMAIL" > "$GPG_DIR/serverkey_private.asc" 2>/dev/null
+GPG_FPR=$(as_webuser gpg --list-keys --with-colons "$GPG_EMAIL" 2>/dev/null \
+    | awk -F: '/^fpr/{print $10; exit}')
+
+as_webuser gpg --armor --export "$GPG_EMAIL" \
+    > "$GPG_DIR/serverkey.asc" 2>/dev/null
+as_webuser gpg --armor --export-secret-keys "$GPG_EMAIL" \
+    > "$GPG_DIR/serverkey_private.asc" 2>/dev/null
+
 chmod 640 "$GPG_DIR/serverkey_private.asc"
+chown www-data:www-data "$GPG_DIR/serverkey.asc" "$GPG_DIR/serverkey_private.asc"
+info "GPG fingerprint: ${GPG_FPR}"
 
 # Append GPG config to passbolt.php
 cat >> "$INSTALL_DIR/config/passbolt.php" <<PHP
 
-// Appended by installer — GPG server key config
+// GPG server key — appended by installer
 \$config['passbolt']['gpg'] = [
     'serverKey' => [
         'fingerprint' => '${GPG_FPR}',
-        'public'  => '${GPG_DIR}/serverkey.asc',
-        'private' => '${GPG_DIR}/serverkey_private.asc',
+        'public'      => '${GPG_DIR}/serverkey.asc',
+        'private'     => '${GPG_DIR}/serverkey_private.asc',
     ],
 ];
 PHP
-
-# Fix the PHP file — remove the closing ?> so appended code is valid
-# (passbolt.php doesn't use closing tags — this is correct as-is)
-
-chown www-data:www-data "$GPG_DIR/serverkey.asc" "$GPG_DIR/serverkey_private.asc"
-info "GPG fingerprint: ${GPG_FPR}"
 
 # =============================================================================
 # 8. DATABASE MIGRATIONS
@@ -271,26 +262,26 @@ cd "$INSTALL_DIR"
 
 run_migration() {
     local label=$1
-    local args=${2:-""}
+    local plugin_arg=${2:-""}
     info "  Migrating: ${label}"
-    sudo -u www-data bin/cake migrations migrate $args --no-lock 2>&1 | tail -3
+    as_webuser bin/cake migrations migrate ${plugin_arg} --no-lock 2>&1 | tail -3
 }
 
 run_migration "Core"
-run_migration "MultiTenant"      "--plugin Passbolt/MultiTenant"
-run_migration "Devices"          "--plugin Passbolt/Devices"
+run_migration "MultiTenant"        "--plugin Passbolt/MultiTenant"
+run_migration "Devices"            "--plugin Passbolt/Devices"
 run_migration "CredentialRotation" "--plugin Passbolt/CredentialRotation"
-run_migration "CredentialEscrow" "--plugin Passbolt/CredentialEscrow"
-run_migration "MspEntraId"       "--plugin Passbolt/MspEntraId"
-run_migration "SuperOpsSync"     "--plugin Passbolt/SuperOpsSync"
+run_migration "CredentialEscrow"   "--plugin Passbolt/CredentialEscrow"
+run_migration "MspEntraId"         "--plugin Passbolt/MspEntraId"
+run_migration "SuperOpsSync"       "--plugin Passbolt/SuperOpsSync"
 
-# Seed admin user
 info "Creating admin user: ${ADMIN_EMAIL}"
-sudo -u www-data bin/cake passbolt register_user \
-    --username  "$ADMIN_EMAIL" \
+as_webuser bin/cake passbolt register_user \
+    --username   "$ADMIN_EMAIL" \
     --first-name "$ADMIN_FIRST" \
     --last-name  "$ADMIN_LAST" \
-    --role admin 2>&1 | tail -5 || warning "Admin user may already exist."
+    --role admin 2>&1 | tail -5 \
+    || warning "Admin user may already exist — continuing."
 
 # =============================================================================
 # 9. NGINX
@@ -311,14 +302,14 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;  # auto-detected version
+        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_read_timeout 120;
     }
 
-    location ~ /\. { deny all; }
+    location ~ /\.          { deny all; }
     location ~* \.(log|key|pem)$ { deny all; }
 }
 NGINX
@@ -326,10 +317,8 @@ NGINX
 ln -sf /etc/nginx/sites-available/msp-vault /etc/nginx/sites-enabled/msp-vault
 rm -f /etc/nginx/sites-enabled/default
 
-# Start PHP-FPM
-systemctl enable php${PHP_VER}-fpm --quiet
-systemctl restart php${PHP_VER}-fpm
-
+systemctl enable "php${PHP_VER}-fpm" --quiet
+systemctl restart "php${PHP_VER}-fpm"
 nginx -t && systemctl reload nginx
 systemctl enable nginx --quiet
 
@@ -338,20 +327,14 @@ systemctl enable nginx --quiet
 # =============================================================================
 info "Setting up cron jobs..."
 
-CRON_FILE="/etc/cron.d/msp-vault"
-cat > "$CRON_FILE" <<CRON
+cat > /etc/cron.d/msp-vault <<CRON
 # MSP-Vault scheduled jobs
-# Credential rotation check — every hour
-0 * * * * www-data cd ${INSTALL_DIR} && bin/cake msp_vault rotation:run_scheduled >> /var/log/msp-vault-rotation.log 2>&1
-
-# SuperOps bidirectional sync — every 30 minutes
+0    * * * * www-data cd ${INSTALL_DIR} && bin/cake msp_vault rotation:run_scheduled >> /var/log/msp-vault-rotation.log 2>&1
 */30 * * * * www-data cd ${INSTALL_DIR} && bin/cake msp_vault superops:sync >> /var/log/msp-vault-superops.log 2>&1
-
-# Email queue — every minute
-* * * * * www-data cd ${INSTALL_DIR} && bin/cake email_queue send >> /var/log/msp-vault-email.log 2>&1
+*    * * * * www-data cd ${INSTALL_DIR} && bin/cake email_queue send >> /var/log/msp-vault-email.log 2>&1
 CRON
 
-chmod 644 "$CRON_FILE"
+chmod 644 /etc/cron.d/msp-vault
 
 # =============================================================================
 # FILE PERMISSIONS
@@ -361,17 +344,18 @@ find "$INSTALL_DIR" -type d -exec chmod 755 {} \;
 find "$INSTALL_DIR" -type f -exec chmod 644 {} \;
 chmod 640 "$INSTALL_DIR/config/passbolt.php"
 chmod 640 "$INSTALL_DIR/config/jwt/jwt.key"
-chmod 640 "$INSTALL_DIR/config/gpg/serverkey_private.asc"
 chmod 700 "$INSTALL_DIR/config/gpg"
+chmod 640 "$INSTALL_DIR/config/gpg/serverkey_private.asc"
 
 # =============================================================================
-# OPTIONAL: SSL WITH CERTBOT
+# OPTIONAL SSL
 # =============================================================================
 if [ -n "$DOMAIN" ]; then
     info "Installing SSL certificate for ${DOMAIN}..."
     apt-get install -y -qq certbot python3-certbot-nginx
     certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
-        -m "$ADMIN_EMAIL" --redirect || warning "SSL setup failed — run manually: certbot --nginx -d ${DOMAIN}"
+        -m "$ADMIN_EMAIL" --redirect \
+        || warning "SSL setup failed — run manually: certbot --nginx -d ${DOMAIN}"
 fi
 
 # =============================================================================
@@ -379,21 +363,21 @@ fi
 # =============================================================================
 echo ""
 echo -e "${GREEN}============================================${NC}"
-echo -e "${GREEN}  MSP-Vault installation complete!${NC}"
+echo -e "${GREEN}  MSP-Vault installation complete!         ${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
-echo -e "  URL:          ${GREEN}${BASE_URL}${NC}"
-echo -e "  Admin login:  ${GREEN}${ADMIN_EMAIL}${NC}"
-echo -e "  GPG key:      ${GREEN}${GPG_FPR}${NC}"
-echo -e "  Install dir:  ${GREEN}${INSTALL_DIR}${NC}"
+echo -e "  URL:         ${GREEN}${BASE_URL}${NC}"
+echo -e "  Admin login: ${GREEN}${ADMIN_EMAIL}${NC}"
+echo -e "  GPG key:     ${GREEN}${GPG_FPR}${NC}"
+echo -e "  Install dir: ${GREEN}${INSTALL_DIR}${NC}"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "  1. Visit ${BASE_URL} to complete the admin account setup"
-echo "  2. Edit /var/www/msp-vault/config/passbolt.php to configure SMTP"
+echo "  1. Visit ${BASE_URL} — complete the admin account setup"
+echo "  2. Edit ${INSTALL_DIR}/config/passbolt.php to configure SMTP"
 if [ -z "$DOMAIN" ]; then
 echo "  3. Point a domain at this server and re-run with DOMAIN set for SSL"
 fi
 echo ""
-echo "  Logs: /var/log/msp-vault-*.log"
+echo "  Logs:   /var/log/msp-vault-*.log"
 echo "  Config: ${INSTALL_DIR}/config/passbolt.php"
 echo ""
