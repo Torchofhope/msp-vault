@@ -15,7 +15,7 @@
 use Cake\Core\Configure;
 ?>
 <!DOCTYPE html>
-<html class="msp-vault no-js no-passboltplugin version" lang="en">
+<html class="passbolt msp-vault no-js no-passboltplugin version" lang="en">
 <head>
     <?= $this->Html->charset() ?>
 
