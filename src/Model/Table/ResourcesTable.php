@@ -103,6 +103,7 @@ class ResourcesTable extends Table implements TableCleanupProviderInterface
         $this->setPrimaryKey('id');
 
         $this->addBehavior('Timestamp');
+        $this->addBehavior('Passbolt/MultiTenant.TenantScope');
 
         $this->hasOne('Creator', [
             'className' => 'Users',

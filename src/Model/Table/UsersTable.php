@@ -96,6 +96,7 @@ class UsersTable extends Table implements TableCleanupProviderInterface
 
         $this->addBehavior('Passbolt/Locale.Locale');
         $this->addBehavior('Timestamp');
+        $this->addBehavior('Passbolt/MultiTenant.TenantScope');
 
         $this->belongsTo('Roles', [
             'foreignKey' => 'role_id',
