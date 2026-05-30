@@ -76,6 +76,9 @@ use EmailQueue\Command\SenderCommand;
 use EmailQueue\EmailQueuePlugin;
 use Migrations\MigrationsPlugin;
 use Passbolt\EmailDigest\EmailDigestPlugin;
+use Passbolt\CredentialHistory\CredentialHistoryPlugin;
+use Passbolt\CredentialRotation\CredentialRotationPlugin;
+use Passbolt\Devices\DevicesPlugin;
 use Passbolt\MultiTenant\MultiTenantPlugin;
 use Passbolt\Rbacs\Service\ActionAccessControl\AdminOnlyRoleActionAccessControlService;
 use Passbolt\Rbacs\Service\ActionAccessControl\RoleActionAccessControlServiceInterface;
@@ -266,7 +269,10 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
         return $this
             ->addPlugin(MigrationsPlugin::class)
             ->addPlugin(AuthenticationPlugin::class)
-            ->addPlugin(MultiTenantPlugin::class);
+            ->addPlugin(MultiTenantPlugin::class)
+            ->addPlugin(DevicesPlugin::class)
+            ->addPlugin(CredentialRotationPlugin::class)
+            ->addPlugin(CredentialHistoryPlugin::class);
     }
 
     /**

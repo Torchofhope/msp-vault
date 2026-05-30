@@ -145,7 +145,10 @@
             "Passbolt\\UserKeyPolicies\\": "./plugins/PassboltCe/UserKeyPolicies/src",
             "Passbolt\\ExportPolicies\\": "./plugins/PassboltCe/ExportPolicies/src",
             "Passbolt\\Scim\\": "./plugins/PassboltEe/Scim/src",
-            "Passbolt\\MultiTenant\\": "./plugins/PassboltCe/MultiTenant/src"
+            "Passbolt\\MultiTenant\\": "./plugins/PassboltCe/MultiTenant/src",
+            "Passbolt\\Devices\\": "./plugins/PassboltCe/Devices/src",
+            "Passbolt\\CredentialRotation\\": "./plugins/PassboltCe/CredentialRotation/src",
+            "Passbolt\\CredentialHistory\\": "./plugins/PassboltCe/CredentialHistory/src"
         }
     },
     "autoload-dev": {
