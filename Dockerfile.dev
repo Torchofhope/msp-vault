@@ -1,0 +1,36 @@
+FROM php:8.2-apache
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git unzip curl gnupg2 libgpgme-dev libssl-dev \
+    libpng-dev libjpeg-dev libfreetype6-dev \
+    libonig-dev libxml2-dev libzip-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN pecl install gnupg && docker-php-ext-enable gnupg
+RUN docker-php-ext-install pdo_mysql mbstring intl zip gd bcmath opcache
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+
+# Apache config for CakePHP
+RUN echo '<VirtualHost *:80>\n\
+    DocumentRoot /var/www/html/webroot\n\
+    <Directory /var/www/html/webroot>\n\
+        AllowOverride All\n\
+        Require all granted\n\
+        Options -Indexes\n\
+    </Directory>\n\
+    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
+    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
+</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# GPG home directory
+RUN mkdir -p /var/lib/gnupg && chmod 700 /var/lib/gnupg
+ENV GNUPGHOME=/var/lib/gnupg
+
+WORKDIR /var/www/html

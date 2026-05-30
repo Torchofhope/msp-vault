@@ -1,0 +1,94 @@
+version: "3.9"
+
+# MSP-Vault local development environment
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml exec app bash
+#   docker compose -f docker-compose.dev.yml down
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: msp-vault-app
+    volumes:
+      - .:/var/www/html
+      - gpg-home:/var/lib/gnupg
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - APP_FULL_BASE_URL=http://localhost:8080
+      - DEBUG=true
+      - DATASOURCES_DEFAULT_HOST=db
+      - DATASOURCES_DEFAULT_USERNAME=mspvault
+      - DATASOURCES_DEFAULT_PASSWORD=mspvault_secret
+      - DATASOURCES_DEFAULT_DATABASE=mspvault
+      - DATASOURCES_TEST_HOST=db
+      - DATASOURCES_TEST_USERNAME=mspvault
+      - DATASOURCES_TEST_PASSWORD=mspvault_secret
+      - DATASOURCES_TEST_DATABASE=mspvault_test
+      - EMAIL_TRANSPORT_DEFAULT_HOST=mailpit
+      - EMAIL_TRANSPORT_DEFAULT_PORT=1025
+      - EMAIL_DEFAULT_FROM=noreply@msp-vault.local
+      - EMAIL_DEFAULT_FROM_NAME=MSP-Vault Dev
+      - PASSBOLT_META_TITLE=MSP-Vault
+      - PASSBOLT_META_DESCRIPTION=Secure. Manage. Protect.
+      - PASSBOLT_GPG_SERVER_KEY_FINGERPRINT=2FC8945833C51946E937F9FED47B0811573EE67E
+      - PASSBOLT_GPG_SERVER_KEY_PRIVATE=/var/www/html/config/gpg/unsecure_private.key
+      - PASSBOLT_GPG_SERVER_KEY_PUBLIC=/var/www/html/config/gpg/unsecure.key
+      - PASSBOLT_SELENIUM_ACTIVE=true
+    networks:
+      - msp-vault
+
+  db:
+    image: mariadb:10.11
+    container_name: msp-vault-db
+    environment:
+      MARIADB_ROOT_PASSWORD: root_secret
+      MARIADB_DATABASE: mspvault
+      MARIADB_USER: mspvault
+      MARIADB_PASSWORD: mspvault_secret
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/db-init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - msp-vault
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: msp-vault-mail
+    ports:
+      - "8025:8025"   # Web UI — view sent emails at http://localhost:8025
+      - "1025:1025"   # SMTP
+    networks:
+      - msp-vault
+
+  adminer:
+    image: adminer:latest
+    container_name: msp-vault-adminer
+    ports:
+      - "8081:8080"   # DB admin UI at http://localhost:8081
+    depends_on:
+      - db
+    networks:
+      - msp-vault
+
+volumes:
+  db-data:
+  gpg-home:
+
+networks:
+  msp-vault:
+    driver: bridge

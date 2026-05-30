@@ -1,4 +1,4 @@
-name: passbolt-api
+name: msp-vault
 type: cakephp
 docroot: webroot
 php_version: "8.4"
@@ -20,7 +20,7 @@ use_dns_when_possible: true
 composer_version: "2"
 web_environment:
     - DEBUG=true
-    - APP_FULL_BASE_URL=https://passbolt-api.ddev.site
+    - APP_FULL_BASE_URL=https://msp-vault.ddev.site
     - PASSBOLT_SELENIUM_ACTIVE=true
     - DATASOURCES_DEFAULT_HOST=db
     - DATASOURCES_DEFAULT_USERNAME=db
@@ -35,8 +35,10 @@ web_environment:
     - PASSBOLT_GPG_SERVER_KEY_PUBLIC=/var/www/html/config/gpg/unsecure.key
     - EMAIL_TRANSPORT_DEFAULT_HOST=localhost
     - EMAIL_TRANSPORT_DEFAULT_PORT=1025
-    - EMAIL_DEFAULT_FROM_NAME=Passbolt Local
-    - EMAIL_DEFAULT_FROM=noreply@passbolt.local
+    - EMAIL_DEFAULT_FROM_NAME=MSP-Vault Local
+    - EMAIL_DEFAULT_FROM=noreply@msp-vault.local
+    - PASSBOLT_META_TITLE=MSP-Vault
+    - PASSBOLT_META_DESCRIPTION=Secure. Manage. Protect.
 corepack_enable: false
 disable_upload_dirs_warning: true
 
