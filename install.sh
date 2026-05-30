@@ -65,7 +65,18 @@ apt-get install -y -qq \
     php-curl php-ldap php-xml \
     php-dev php-pear \
     libgpgme-dev gnupg2 \
-    curl git unzip openssl nginx
+    curl git unzip openssl
+
+# Install nginx; if it fails, fall back to Apache2 (may already be installed)
+if apt-get install -y -qq nginx 2>/dev/null; then
+    WEB_SERVER="nginx"
+    info "nginx installed."
+elif command -v apache2 &>/dev/null || apt-get install -y -qq apache2 libapache2-mod-php 2>/dev/null; then
+    WEB_SERVER="apache2"
+    info "Apache2 will be used as web server."
+else
+    error "Could not install nginx or Apache2."
+fi
 
 # Detect actual PHP version now that php is installed
 PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
@@ -285,11 +296,17 @@ as_webuser bin/cake passbolt register_user \
     || warning "Admin user may already exist — continuing."
 
 # =============================================================================
-# 9. NGINX
+# 9. WEB SERVER CONFIGURATION
 # =============================================================================
-info "Step 9/9 — Configuring nginx..."
+info "Step 9/9 — Configuring web server (${WEB_SERVER})..."
 
-cat > /etc/nginx/sites-available/msp-vault <<NGINX
+if [ "$WEB_SERVER" = "nginx" ]; then
+
+    # Stop Apache2 if it's running so it doesn't conflict
+    systemctl stop apache2 2>/dev/null || true
+    systemctl disable apache2 2>/dev/null || true
+
+    cat > /etc/nginx/sites-available/msp-vault <<NGINX
 server {
     listen 80;
     server_name ${DOMAIN:-_};
@@ -310,18 +327,46 @@ server {
         fastcgi_read_timeout 120;
     }
 
-    location ~ /\.          { deny all; }
+    location ~ /\.                { deny all; }
     location ~* \.(log|key|pem)$ { deny all; }
 }
 NGINX
 
-ln -sf /etc/nginx/sites-available/msp-vault /etc/nginx/sites-enabled/msp-vault
-rm -f /etc/nginx/sites-enabled/default
+    ln -sf /etc/nginx/sites-available/msp-vault /etc/nginx/sites-enabled/msp-vault
+    rm -f /etc/nginx/sites-enabled/default
 
-systemctl enable "php${PHP_VER}-fpm" --quiet
-systemctl restart "php${PHP_VER}-fpm"
-nginx -t && systemctl reload nginx
-systemctl enable nginx --quiet
+    systemctl enable "php${PHP_VER}-fpm" --quiet
+    systemctl restart "php${PHP_VER}-fpm"
+    nginx -t && systemctl reload nginx
+    systemctl enable nginx --quiet
+
+else
+    # Apache2 path
+    apt-get install -y -qq libapache2-mod-php 2>/dev/null || true
+    a2enmod rewrite php${PHP_VER} 2>/dev/null || a2enmod rewrite 2>/dev/null || true
+
+    cat > /etc/apache2/sites-available/msp-vault.conf <<APACHE
+<VirtualHost *:80>
+    ServerName ${DOMAIN:-_}
+    DocumentRoot ${INSTALL_DIR}/webroot
+
+    <Directory ${INSTALL_DIR}/webroot>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/msp-vault-error.log
+    CustomLog \${APACHE_LOG_DIR}/msp-vault-access.log combined
+</VirtualHost>
+APACHE
+
+    a2ensite msp-vault.conf
+    a2dissite 000-default.conf 2>/dev/null || true
+    systemctl restart apache2
+    systemctl enable apache2 --quiet
+
+fi
 
 # =============================================================================
 # CRON JOBS
