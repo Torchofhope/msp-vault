@@ -28,6 +28,19 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 [ "$(id -u)" -ne 0 ] && error "Run as root: sudo bash install.sh"
 
+# Auto-detect available PHP version (prefers 8.3, falls back to 8.2 or 8.4)
+detect_php_version() {
+    for ver in 8.3 8.2 8.4; do
+        if apt-cache show "php${ver}" &>/dev/null 2>&1; then
+            echo "$ver"
+            return
+        fi
+    done
+    error "No supported PHP version (8.2/8.3/8.4) found in apt. Run: apt-get update first."
+}
+PHP_VER=$(detect_php_version)
+info "Detected PHP version: ${PHP_VER}"
+
 # Detect server IP if no domain set
 if [ -z "$DOMAIN" ]; then
     SERVER_IP=$(hostname -I | awk '{print $1}')
@@ -53,14 +66,14 @@ info "Step 2/9 — Installing PHP 8.2 and extensions..."
 
 # Debian 13 ships PHP 8.2 in main repos
 apt-get install -y -qq \
-    php8.2 php8.2-cli php8.2-fpm \
-    php8.2-mysql php8.2-mbstring php8.2-intl \
-    php8.2-zip php8.2-gd php8.2-bcmath php8.2-opcache \
-    php8.2-curl php8.2-ldap php8.2-xml php8.2-gnupg \
+    php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-fpm \
+    php${PHP_VER}-mysql php${PHP_VER}-mbstring php${PHP_VER}-intl \
+    php${PHP_VER}-zip php${PHP_VER}-gd php${PHP_VER}-bcmath php${PHP_VER}-opcache \
+    php${PHP_VER}-curl php${PHP_VER}-ldap php${PHP_VER}-xml php${PHP_VER}-gnupg \
     gnupg2 curl git unzip openssl nginx
 
 # Verify gnupg extension is available
-php -m | grep -q gnupg || error "PHP gnupg extension not loaded. Check: apt install php8.2-gnupg"
+php -m | grep -q gnupg || error "PHP gnupg extension not loaded. Check: apt install php${PHP_VER}-gnupg"
 
 # =============================================================================
 # 3. COMPOSER
@@ -277,7 +290,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
