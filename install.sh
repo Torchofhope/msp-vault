@@ -30,6 +30,9 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 [ "$(id -u)" -ne 0 ] && error "Run as root: bash install.sh"
 
+# Ensure sbin is in PATH (minimal Debian installs may omit it)
+export PATH="$PATH:/usr/sbin:/sbin"
+
 # Helper: run a command as www-data without requiring sudo
 as_webuser() {
     su -s /bin/bash www-data -c "$*"
