@@ -182,8 +182,8 @@ return [
 
         // Html meta information.
         'meta' => [
-            'title' => env('PASSBOLT_META_TITLE', 'Passbolt'),
-            'description' => env('PASSBOLT_META_DESCRIPTION', 'Open source password manager for teams'),
+            'title' => env('PASSBOLT_META_TITLE', 'MSP-Vault'),
+            'description' => env('PASSBOLT_META_DESCRIPTION', 'Secure. Manage. Protect.'),
             // Do you want search engine robots to index your site.
             // Default is set to false.
             'robots' => env('PASSBOLT_META_ROBOTS', 'noindex, nofollow')

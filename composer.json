@@ -1,7 +1,7 @@
 {
-    "name": "passbolt/passbolt_api",
-    "description": "Open source password manager for teams",
-    "homepage": "https://www.passbolt.com",
+    "name": "torchofhope/msp-vault",
+    "description": "MSP-Vault - Secure. Manage. Protect.",
+    "homepage": "https://github.com/Torchofhope/msp-vault",
     "type": "application",
     "license": "AGPL-3.0-or-later",
     "keywords": [
