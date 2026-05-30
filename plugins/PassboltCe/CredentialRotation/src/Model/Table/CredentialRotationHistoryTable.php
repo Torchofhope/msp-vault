@@ -14,7 +14,6 @@ class CredentialRotationHistoryTable extends Table
 
         $this->setTable('credential_rotation_history');
         $this->setPrimaryKey('id');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
 
         $this->belongsTo('Resources', ['className' => 'Resources', 'foreignKey' => 'resource_id']);

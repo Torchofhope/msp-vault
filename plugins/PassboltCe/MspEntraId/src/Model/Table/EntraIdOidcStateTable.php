@@ -13,7 +13,6 @@ class EntraIdOidcStateTable extends Table
 
         $this->setTable('entra_id_oidc_state');
         $this->setPrimaryKey('id');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
     }
 }

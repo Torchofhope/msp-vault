@@ -17,7 +17,6 @@ class EscrowRequestsTable extends Table
         $this->setEntityClass(EscrowRequest::class);
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
 
         $this->belongsTo('Resources', ['className' => 'Resources', 'foreignKey' => 'resource_id']);
         $this->belongsTo('Requester', [

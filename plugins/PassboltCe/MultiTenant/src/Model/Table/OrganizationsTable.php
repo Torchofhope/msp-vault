@@ -19,7 +19,6 @@ class OrganizationsTable extends Table
         $this->setPrimaryKey('id');
 
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
 
         $this->hasMany('OrganizationUsers', [
             'className' => 'Passbolt/MultiTenant.OrganizationUsers',

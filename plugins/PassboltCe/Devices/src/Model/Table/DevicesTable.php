@@ -19,7 +19,6 @@ class DevicesTable extends Table
         $this->setPrimaryKey('id');
 
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Passbolt/MultiTenant.TenantScope');
 
         $this->hasMany('DeviceCredentials', [

@@ -13,7 +13,6 @@ class SuperOpsSyncLogTable extends Table
 
         $this->setTable('superops_sync_log');
         $this->setPrimaryKey('id');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
     }
 }

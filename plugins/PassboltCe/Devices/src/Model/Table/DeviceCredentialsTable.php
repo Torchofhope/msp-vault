@@ -14,7 +14,6 @@ class DeviceCredentialsTable extends Table
 
         $this->setTable('device_credentials');
         $this->setPrimaryKey('id');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
 
         $this->belongsTo('Devices', [

@@ -17,7 +17,6 @@ class OrganizationUserGrantsTable extends Table
         $this->setPrimaryKey('id');
 
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
-        $this->addBehavior('Uuid');
 
         $this->belongsTo('Organizations', [
             'className' => 'Passbolt/MultiTenant.Organizations',

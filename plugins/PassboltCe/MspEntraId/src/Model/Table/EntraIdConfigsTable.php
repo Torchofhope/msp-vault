@@ -18,7 +18,6 @@ class EntraIdConfigsTable extends Table
         $this->setEntityClass(EntraIdConfig::class);
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
 
         $this->belongsTo('Organizations', [
             'className' => 'Passbolt/MultiTenant.Organizations',

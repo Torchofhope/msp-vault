@@ -18,7 +18,6 @@ class SuperOpsSyncConfigsTable extends Table
         $this->setEntityClass(SuperOpsSyncConfig::class);
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
 
         $this->belongsTo('Organizations', [
             'className' => 'Passbolt/MultiTenant.Organizations',

@@ -14,7 +14,6 @@ class EscrowAccessGrantsTable extends Table
 
         $this->setTable('escrow_access_grants');
         $this->setPrimaryKey('id');
-        $this->addBehavior('Uuid');
         $this->addBehavior('Timestamp', ['events' => ['Model.beforeSave' => ['created' => 'new']]]);
 
         $this->belongsTo('EscrowRequests', [

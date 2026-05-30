@@ -18,7 +18,6 @@ class CredentialRotationPoliciesTable extends Table
         $this->setEntityClass(CredentialRotationPolicy::class);
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
-        $this->addBehavior('Uuid');
 
         $this->belongsTo('Resources', [
             'className' => 'Resources',

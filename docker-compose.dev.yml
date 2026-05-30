@@ -1,5 +1,3 @@
-version: "3.9"
-
 # MSP-Vault local development environment
 # Usage:
 #   docker compose -f docker-compose.dev.yml up -d
